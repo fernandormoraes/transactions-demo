@@ -1,15 +1,17 @@
 package usecases
 
 import (
+	"strconv"
 	"time"
 
-	"github.com/fernandormoraes/transaction-demo/internal/pkg/models"
+	"github.com/fernandormoraes/transaction-demo/internal/api/dto"
 	"github.com/fernandormoraes/transaction-demo/internal/pkg/persistence"
 	"github.com/fernandormoraes/transaction-demo/internal/pkg/remote"
+	"github.com/fernandormoraes/transaction-demo/pkg/helpers"
 )
 
 type RetrieveTransaction interface {
-	Run(date time.Time) (transactions []models.Transaction, err error)
+	Run(date time.Time, currencyDesc string) (transactionsRetrieved []dto.TransactionRetrieveDto, err error)
 }
 
 type RetrieveTransactionUseCase struct {
@@ -26,12 +28,38 @@ func NewRetrieveTransactionUseCase(
 	}
 }
 
-func (u RetrieveTransactionUseCase) Run(date time.Time) (transactions []models.Transaction, err error) {
-	transactions, err = u.transactionRepository.GetByDate(date)
+func (u RetrieveTransactionUseCase) Run(date time.Time, currencyDesc string) (transactionsRetrieved []dto.TransactionRetrieveDto, err error) {
+	transactions, err := u.transactionRepository.GetByDate(date)
 
 	if err != nil {
-		return transactions, err
+		return make([]dto.TransactionRetrieveDto, 0), err
 	}
 
-	return transactions, nil
+	strDate := date.Format(helpers.LayoutDate)
+
+	exchanges, err := u.remoteTreasury.FindAll(strDate, currencyDesc)
+
+	if err != nil || len(exchanges) <= 0 {
+		return make([]dto.TransactionRetrieveDto, 0), err
+	}
+
+	exchangeRate, err := strconv.ParseFloat(exchanges[0].ExchangeRate, 64)
+
+	if err != nil {
+		return nil, err
+	}
+
+	transactionsRetrieveDto := make([]dto.TransactionRetrieveDto, 0)
+
+	for _, transaction := range transactions {
+		transactionsRetrieveDto = append(transactionsRetrieveDto, dto.TransactionRetrieveDto{
+			Description:     transaction.Description,
+			Date:            transaction.Date,
+			Amount:          transaction.Amount,
+			ConvertedAmount: helpers.RoundFloat(transaction.Amount*exchangeRate, 2),
+			ExchangeRate:    exchangeRate,
+		})
+	}
+
+	return transactionsRetrieveDto, nil
 }

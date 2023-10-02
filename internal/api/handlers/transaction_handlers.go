@@ -88,7 +88,16 @@ func (h TransactionHandlers) PostTransaction(c echo.Context) error {
 }
 
 func (h TransactionHandlers) RetrieveTransactions(c echo.Context) error {
-	transactions, err := h.retrieveTransaction.Run(time.Now())
+	date := c.QueryParam("transactionDate")
+	currencyDesc := c.QueryParam("currencyDesc")
+
+	dateTime, err := time.Parse(helpers.LayoutDate, date)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	transactions, err := h.retrieveTransaction.Run(dateTime, currencyDesc)
 
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())

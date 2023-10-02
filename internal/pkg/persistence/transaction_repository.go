@@ -36,7 +36,10 @@ func (r SqliteTransactionRepository) Create(transaction models.Transaction) (*mo
 }
 
 func (r SqliteTransactionRepository) GetByDate(date time.Time) (transactions []models.Transaction, err error) {
-	tx := r.db.Where("date >= ? AND date <= ?", date.Format("2006-01-02 00:00:01"), date.Format("2006-01-02 23:59:59")).Find(&transactions)
+	initialDate := date.Format("2006-01-02") + " 00:00:01"
+	finalDate := date.Format("2006-01-02") + " 23:59:59"
+
+	tx := r.db.Where("date >= ? AND date <= ?", initialDate, finalDate).Find(&transactions)
 
 	if tx.Error != nil {
 		return nil, tx.Error
